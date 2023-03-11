@@ -14,10 +14,11 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import app.kaisa.drugs4covid.analysis.LuminosityAnalyzer
+import app.kaisa.drugs4covid.analysis.TextAnalyzer
 import app.kaisa.drugs4covid.databinding.ActivityMainBinding
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.nio.ByteBuffer
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -119,9 +120,10 @@ class MainActivity : AppCompatActivity() {
                 .also {
                     it.setAnalyzer(
                         cameraExecutor,
-                        LuminosityAnalyzer { luma ->
-                            Log.d(TAG, "Average luminosity: $luma")
-                        },
+                        TextAnalyzer()
+//                        LuminosityAnalyzer { luma ->
+//                            Log.d(TAG, "Average luminosity: $luma")
+//                        },
                     )
                 }
 
@@ -180,27 +182,6 @@ class MainActivity : AppCompatActivity() {
                 ).show()
                 finish()
             }
-        }
-    }
-
-    private class LuminosityAnalyzer(private val listener: LumaListener) : ImageAnalysis.Analyzer {
-
-        private fun ByteBuffer.toByteArray(): ByteArray {
-            rewind() // Rewind the buffer to zero
-            val data = ByteArray(remaining())
-            get(data) // Copy the buffer into a byte array
-            return data // Return the byte array
-        }
-
-        override fun analyze(image: ImageProxy) {
-            val buffer = image.planes[0].buffer
-            val data = buffer.toByteArray()
-            val pixels = data.map { it.toInt() and 0xFF }
-            val luma = pixels.average()
-
-            listener(luma)
-
-            image.close()
         }
     }
 
