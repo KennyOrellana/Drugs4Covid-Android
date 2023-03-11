@@ -3,4 +3,28 @@ plugins {
     id 'com.android.application' version '7.4.2' apply false
     id 'com.android.library' version '7.4.2' apply false
     id 'org.jetbrains.kotlin.android' version '1.8.0' apply false
+    id 'com.google.dagger.hilt.android' version '2.44' apply false
+}
+
+ext {
+    versions = [
+            // Core
+            kotlin            : '1.9.0',
+            google_services   : '4.3.13',
+            androidx_core     : '1.9.0',
+            androidx_appcompat: '1.6.1',
+
+            // UI
+            material          : '1.8.0',
+            constraint_layout : '2.1.4',
+
+            // DI
+            hilt              : '2.44.2',
+
+            // Images
+            camerax           : '1.2.1',
+
+            // ML
+            mlkit             : '16.0.0-beta6',
+    ]
 }
