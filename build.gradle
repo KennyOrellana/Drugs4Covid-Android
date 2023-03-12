@@ -13,6 +13,7 @@ ext {
             google_services   : '4.3.13',
             androidx_core     : '1.9.0',
             androidx_appcompat: '1.6.1',
+            coroutines        : '1.6.4',
 
             // UI
             material          : '1.8.0',
@@ -20,6 +21,10 @@ ext {
 
             // DI
             hilt              : '2.44.2',
+
+            // Data
+            room              : '2.5.0',
+            lifecycle         : '2.6.0',
 
             // Images
             camerax           : '1.2.1',

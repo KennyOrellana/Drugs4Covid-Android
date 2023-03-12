@@ -8,35 +8,52 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Log
+import android.view.Surface
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.AspectRatio.RATIO_16_9
 import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView.StreamState
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import app.kaisa.drugs4covid.analysis.LuminosityAnalyzer
 import app.kaisa.drugs4covid.analysis.TextAnalyzer
 import app.kaisa.drugs4covid.databinding.ActivityMainBinding
+import app.kaisa.drugs4covid.db.D4CDatabase
+import app.kaisa.drugs4covid.db.entity.Atc
+import app.kaisa.drugs4covid.db.entity.Disease
+import app.kaisa.drugs4covid.db.entity.Drug
+import app.kaisa.drugs4covid.models.BioEntity
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import com.opencsv.CSVReaderBuilder
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.*
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import javax.inject.Inject
 
 typealias LumaListener = (luma: Double) -> Unit
 
+@AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
+    @Inject
+    lateinit var db: D4CDatabase
+    lateinit var analyzer: TextAnalyzer
+
     private lateinit var viewBinding: ActivityMainBinding
 
     private var imageCapture: ImageCapture? = null
-
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(viewBinding.root)
+
+        readPreviewSize()
 
         // Request camera permissions
         if (allPermissionsGranted()) {
@@ -53,6 +70,26 @@ class MainActivity : AppCompatActivity() {
         viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+        loadDB()
+    }
+
+    private fun setupAnalyzer(
+        previewWidth: Int,
+        previewHeight: Int,
+        isFrontLens: Boolean,
+    ): Unit = with(viewBinding) {
+        analyzer = TextAnalyzer(db, previewWidth, previewHeight, isFrontLens)
+        analyzer.listener = object : TextAnalyzer.Listener {
+            override fun onEntitiesDetected(entityBounds: List<BioEntity>) {
+                entityOverlay.post {
+                    entityOverlay.drawEntitiesBounds(entityBounds)
+                }
+            }
+
+            override fun onError(exception: Exception) {
+//                TODO("Not yet implemented")
+            }
+        }
     }
 
     private fun takePhoto() {
@@ -82,21 +119,31 @@ class MainActivity : AppCompatActivity() {
         // Set up image capture listener, which is triggered after photo has
         // been taken
         imageCapture.takePicture(
-            outputOptions,
             ContextCompat.getMainExecutor(this),
-            object : ImageCapture.OnImageSavedCallback {
+            object : ImageCapture.OnImageCapturedCallback() {
+
                 override fun onError(exc: ImageCaptureException) {
                     Log.e(TAG, "Photo capture failed: ${exc.message}", exc)
                 }
 
-                override fun
-                onImageSaved(output: ImageCapture.OutputFileResults) {
-                    val msg = "Photo capture succeeded: ${output.savedUri}"
-                    Toast.makeText(baseContext, msg, Toast.LENGTH_SHORT).show()
-                    Log.d(TAG, msg)
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    super.onCaptureSuccess(image)
+                    freezePreview()
+                    analyzeImage(image)
                 }
             },
         )
+    }
+
+    fun freezePreview() {
+        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        cameraProviderFuture.get().unbindAll()
+    }
+
+    fun analyzeImage(image: ImageProxy) {
+        CoroutineScope(Dispatchers.IO).launch {
+            analyzer.analyzeOnBackground(image)
+        }
     }
 
     private fun startCamera() {
@@ -108,24 +155,15 @@ class MainActivity : AppCompatActivity() {
 
             // Preview
             val preview = Preview.Builder()
+                .setTargetAspectRatio(RATIO_16_9)
                 .build()
                 .also {
                     it.setSurfaceProvider(viewBinding.viewFinder.surfaceProvider)
                 }
 
-            imageCapture = ImageCapture.Builder().build()
-
-            val imageAnalyzer = ImageAnalysis.Builder()
+            imageCapture = ImageCapture.Builder()
+                .setTargetAspectRatio(RATIO_16_9)
                 .build()
-                .also {
-                    it.setAnalyzer(
-                        cameraExecutor,
-                        TextAnalyzer()
-//                        LuminosityAnalyzer { luma ->
-//                            Log.d(TAG, "Average luminosity: $luma")
-//                        },
-                    )
-                }
 
             // Select back camera as a default
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
@@ -140,12 +178,40 @@ class MainActivity : AppCompatActivity() {
                     cameraSelector,
                     preview,
                     imageCapture,
-                    imageAnalyzer,
                 )
             } catch (exc: Exception) {
                 Log.e(TAG, "Use case binding failed", exc)
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    fun readPreviewSize() {
+        viewBinding.viewFinder.previewStreamState.observe(
+            this,
+            object : androidx.lifecycle.Observer<StreamState> {
+                override fun onChanged(streamState: StreamState) {
+                    if (streamState != StreamState.STREAMING) {
+                        return
+                    }
+
+                    val preview = viewBinding.viewFinder.getChildAt(0)
+                    var width = preview.width * preview.scaleX
+                    var height = preview.height * preview.scaleY
+                    val rotation = preview.display.rotation
+                    if (rotation == Surface.ROTATION_90 || rotation == Surface.ROTATION_270) {
+                        val temp = width
+                        width = height
+                        height = temp
+                    }
+                    Log.v(
+                        "Sizes",
+                        "Preview size: $width x $height. width: ${preview.width} height: ${preview.height} scaleX: ${preview.scaleX} scaleY: ${preview.scaleY} rotation: $rotation",
+                    )
+                    setupAnalyzer(width.toInt(), height.toInt(), false)
+                    viewBinding.viewFinder.previewStreamState.removeObserver(this)
+                }
+            },
+        )
     }
 
     private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
@@ -162,6 +228,63 @@ class MainActivity : AppCompatActivity() {
 
     private fun recognizeText() {
         val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+
+    private fun loadDB() {
+        GlobalScope.launch(Dispatchers.IO) {
+            if (db.atc().count() == 0) {
+                populateDb("atc")
+            }
+            if (db.drug().count() == 0) {
+                populateDb("drugs")
+            }
+            if (db.disease().count() == 0) {
+                populateDb("diseases")
+            }
+        }
+    }
+
+    fun populateDb(table: String) {
+        val csvReader = CSVReaderBuilder(assets.open("$table.csv").reader())
+            .withSkipLines(1)
+            .build()
+
+        csvReader.use { reader ->
+
+            val records = reader.readAll().map { record ->
+                when (table) {
+                    "atc" -> {
+                        Atc(
+                            id = record[0],
+                            name = record[1],
+                        )
+                    }
+                    "drugs" -> {
+                        Drug(
+                            id = record[0],
+                            name = record[1],
+                        )
+                    }
+                    "diseases" -> {
+                        Disease(
+                            id = record[1],
+                            name = record[0],
+                        )
+                    }
+                    else -> {
+                        throw Exception("Unknown table")
+                    }
+                }
+            }
+
+            when (table) {
+                "atc" -> db.atc().insertAll(records as List<Atc>)
+                "drugs" -> db.drug().insertAll(records as List<Drug>)
+                "diseases" -> db.disease().insertAll(records as List<Disease>)
+            }
+
+            val count = db.atc().count()
+        }
     }
 
     @SuppressLint("MissingSuperCall")
