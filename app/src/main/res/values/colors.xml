@@ -7,4 +7,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="marker_disease">#406200EE</color>
+    <color name="marker_atc">#4003DAC5</color>
+    <color name="marker_drug">#40EE6C4D</color>
 </resources>

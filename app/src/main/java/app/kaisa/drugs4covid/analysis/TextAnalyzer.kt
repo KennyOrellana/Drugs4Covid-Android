@@ -21,11 +21,13 @@ class TextAnalyzer(
     private val previewHeight: Int,
     private val isFrontLens: Boolean,
 ) {
+    val matched = arrayListOf<BioEntity>()
 
     /** Listener to receive callbacks for when entities are detected, or an error occurs.  */
     var listener: Listener? = null
 
     suspend fun analyzeOnBackground(imageProxy: ImageProxy) {
+        matched.clear()
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
@@ -48,7 +50,6 @@ class TextAnalyzer(
         }
     }
 
-    val matched = arrayListOf<BioEntity>()
     private fun printText(result: Text, width: Int, height: Int) {
         for (block in result.textBlocks) {
             val blockText = block.text

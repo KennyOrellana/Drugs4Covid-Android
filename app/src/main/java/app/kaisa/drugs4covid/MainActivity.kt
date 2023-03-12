@@ -17,6 +17,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView.StreamState
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import app.kaisa.drugs4covid.analysis.TextAnalyzer
 import app.kaisa.drugs4covid.databinding.ActivityMainBinding
 import app.kaisa.drugs4covid.db.D4CDatabase
@@ -48,6 +49,8 @@ class MainActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
 
+    private var isAnalyzing = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         viewBinding = ActivityMainBinding.inflate(layoutInflater)
@@ -67,8 +70,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Set up the listeners for take photo and video capture buttons
-        viewBinding.imageCaptureButton.setOnClickListener { takePhoto() }
-
+        viewBinding.imageCaptureButton.setOnClickListener {
+            if (isAnalyzing) {
+                viewBinding.entityOverlay.clear()
+                startCamera()
+                viewBinding.imageCaptureButton.text = "Analyze"
+            } else {
+                takePhoto()
+                viewBinding.imageCaptureButton.text = "Back"
+            }
+            isAnalyzing = !isAnalyzing
+        }
         cameraExecutor = Executors.newSingleThreadExecutor()
         loadDB()
     }
@@ -129,6 +141,7 @@ class MainActivity : AppCompatActivity() {
                 override fun onCaptureSuccess(image: ImageProxy) {
                     super.onCaptureSuccess(image)
                     freezePreview()
+                    viewBinding.progressBar.isVisible = true
                     analyzeImage(image)
                 }
             },
@@ -143,6 +156,9 @@ class MainActivity : AppCompatActivity() {
     fun analyzeImage(image: ImageProxy) {
         CoroutineScope(Dispatchers.IO).launch {
             analyzer.analyzeOnBackground(image)
+            runOnUiThread {
+                viewBinding.progressBar.isVisible = false
+            }
         }
     }
 
