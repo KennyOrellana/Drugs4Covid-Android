@@ -11,13 +11,14 @@ import android.util.Log
 import android.view.Surface
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.*
+import androidx.camera.core.* // ktlint-disable no-wildcard-imports
 import androidx.camera.core.AspectRatio.RATIO_16_9
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView.StreamState
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.lifecycleScope
 import app.kaisa.drugs4covid.analysis.TextAnalyzer
 import app.kaisa.drugs4covid.databinding.ActivityMainBinding
 import app.kaisa.drugs4covid.db.D4CDatabase
@@ -25,11 +26,11 @@ import app.kaisa.drugs4covid.db.entity.Atc
 import app.kaisa.drugs4covid.db.entity.Disease
 import app.kaisa.drugs4covid.db.entity.Drug
 import app.kaisa.drugs4covid.models.BioEntity
-import com.google.mlkit.vision.text.TextRecognition
-import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import com.opencsv.CSVReaderBuilder
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ExecutorService
@@ -85,6 +86,15 @@ class MainActivity : AppCompatActivity() {
         loadDB()
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (isAnalyzing) {
+            isAnalyzing = false
+            startCamera()
+            viewBinding.imageCaptureButton.text = "Analyze"
+        }
+    }
+
     private fun setupAnalyzer(
         previewWidth: Int,
         previewHeight: Int,
@@ -120,13 +130,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Create output options object which contains file + metadata
-        val outputOptions = ImageCapture.OutputFileOptions
-            .Builder(
-                contentResolver,
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
-                contentValues,
-            )
-            .build()
+//        val outputOptions = ImageCapture.OutputFileOptions
+//            .Builder(
+//                contentResolver,
+//                MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+//                contentValues,
+//            )
+//            .build()
 
         // Set up image capture listener, which is triggered after photo has
         // been taken
@@ -242,12 +252,12 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor.shutdown()
     }
 
-    private fun recognizeText() {
-        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-    }
+//    private fun recognizeText() {
+//        val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+//    }
 
     private fun loadDB() {
-        GlobalScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch(Dispatchers.IO) {
             if (db.atc().count() == 0) {
                 populateDb("atc")
             }
@@ -299,7 +309,7 @@ class MainActivity : AppCompatActivity() {
                 "diseases" -> db.disease().insertAll(records as List<Disease>)
             }
 
-            val count = db.atc().count()
+//            val count = db.atc().count()
         }
     }
 

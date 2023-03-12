@@ -35,6 +35,11 @@ android {
     buildFeatures {
         viewBinding true
     }
+    configurations {
+        all {
+            exclude module: 'commons-logging'
+        }
+    }
 }
 
 dependencies {
@@ -51,8 +56,8 @@ dependencies {
     implementation "androidx.room:room-runtime:${versions.room}"
     implementation "androidx.room:room-ktx:${versions.room}"
     kapt "androidx.room:room-compiler:${versions.room}"
-    implementation 'com.opencsv:opencsv:5.5.2'
-    implementation "org.apache.commons:commons-csv:1.8"
+    implementation 'com.opencsv:opencsv:5.7.1'
+//    implementation "org.apache.commons:commons-csv:1.8"
     implementation "androidx.lifecycle:lifecycle-livedata-core-ktx:${versions.lifecycle}"
     implementation "androidx.lifecycle:lifecycle-livedata-ktx:${versions.lifecycle}"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:${versions.coroutines}"

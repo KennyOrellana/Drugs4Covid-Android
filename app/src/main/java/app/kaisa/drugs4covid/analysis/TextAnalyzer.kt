@@ -21,12 +21,12 @@ class TextAnalyzer(
     private val previewHeight: Int,
     private val isFrontLens: Boolean,
 ) {
-    val matched = arrayListOf<BioEntity>()
+    private val matched = arrayListOf<BioEntity>()
 
     /** Listener to receive callbacks for when entities are detected, or an error occurs.  */
     var listener: Listener? = null
 
-    suspend fun analyzeOnBackground(imageProxy: ImageProxy) {
+    fun analyzeOnBackground(imageProxy: ImageProxy) {
         matched.clear()
         val mediaImage = imageProxy.image
         if (mediaImage != null) {
@@ -52,13 +52,13 @@ class TextAnalyzer(
 
     private fun printText(result: Text, width: Int, height: Int) {
         for (block in result.textBlocks) {
-            val blockText = block.text
-            val blockCornerPoints = block.cornerPoints
-            val blockFrame = block.boundingBox
+//            val blockText = block.text
+//            val blockCornerPoints = block.cornerPoints
+//            val blockFrame = block.boundingBox
             for (line in block.lines) {
-                val lineText = line.text
-                val lineCornerPoints = line.cornerPoints
-                val lineFrame = line.boundingBox
+//                val lineText = line.text
+//                val lineCornerPoints = line.cornerPoints
+//                val lineFrame = line.boundingBox
                 for (element in line.elements) {
                     val elementText = element.text
                     val drugs = db.drug().search(elementText)
@@ -83,8 +83,8 @@ class TextAnalyzer(
                         )
                     }
 
-                    val atc = db.atc().search(elementText)
-                    atc.forEach { atc ->
+                    val atcs = db.atc().search(elementText)
+                    atcs.forEach { atc ->
                         matched.add(
                             AtcEntity(
                                 element,
